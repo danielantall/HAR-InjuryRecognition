@@ -46,6 +46,7 @@ global_state = {
     "confidence": 0.0,
     "buffer_fill": 0,
     "buffer_max": BUFFER_SIZE,
+    "latest_gravity": (0.0, 0.0, 9.81), # default resting gravity
 }
 
 # Rolling buffer for sensor data: each item = [acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z]
@@ -95,10 +96,20 @@ def run_inference():
         return
 
     # Shape: (1, 128, 6)
-    window = np.array(list(sensor_buffer)).reshape(1, BUFFER_SIZE, 6)
-    prob = float(model.predict(window, verbose=0)[0][0])
-
-    label = "Fatigued" if prob > PREDICTION_THRESHOLD else "Optimal"
+    window_data = np.array(list(sensor_buffer))
+    
+    # Calculate standard deviation of body acceleration (first 3 columns)
+    acc_std = np.std(window_data[:, :3], axis=0)
+    mean_std = np.mean(acc_std)
+    
+    STATIONARY_THRESHOLD = 0.05  # threshold for stationary detection in 'g'
+    if mean_std < STATIONARY_THRESHOLD:
+        prob = 0.0
+        label = "Optimal"
+    else:
+        window = window_data.reshape(1, BUFFER_SIZE, 6)
+        prob = float(model.predict(window, verbose=0)[0][0])
+        label = "Fatigued" if prob > PREDICTION_THRESHOLD else "Optimal"
 
     with state_lock:
         global_state["prediction"] = label
@@ -177,7 +188,13 @@ def stream():
                 continue
 
             if any(k in sensor_name for k in ("acc", "accelero", "linear", "gravity")):
-                batch_acc = values
+                if "gravity" in sensor_name:
+                    with state_lock:
+                        global_state["latest_gravity"] = values
+                    print(f"🌍 Gravity received: X={values[0]:.2f} | Y={values[1]:.2f} | Z={values[2]:.2f}")
+                    continue
+                else:
+                    batch_acc = values
             elif any(k in sensor_name for k in ("gyro", "rotation", "angular")):
                 batch_gyro = values
 
@@ -337,9 +354,33 @@ def _find_gyro(obj):
     return None
 
 
+_ema_state = None
+
 def _process_sample(acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z):
     """Add a complete 6-channel sample to the buffer and update state."""
-    sample = [acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z]
+    global _ema_state
+    
+    with state_lock:
+        grav = global_state.get("latest_gravity", (0.0, 0.0, 9.81))
+
+    # Subtract gravity and convert to g
+    body_acc_x = (acc_x - grav[0]) / 9.81
+    body_acc_y = (acc_y - grav[1]) / 9.81
+    body_acc_z = (acc_z - grav[2]) / 9.81
+
+    # Apply EMA Smoothing
+    alpha = 0.3
+    if _ema_state is None:
+        _ema_state = [body_acc_x, body_acc_y, body_acc_z, gyro_x, gyro_y, gyro_z]
+    else:
+        _ema_state[0] = alpha * body_acc_x + (1 - alpha) * _ema_state[0]
+        _ema_state[1] = alpha * body_acc_y + (1 - alpha) * _ema_state[1]
+        _ema_state[2] = alpha * body_acc_z + (1 - alpha) * _ema_state[2]
+        _ema_state[3] = alpha * gyro_x + (1 - alpha) * _ema_state[3]
+        _ema_state[4] = alpha * gyro_y + (1 - alpha) * _ema_state[4]
+        _ema_state[5] = alpha * gyro_z + (1 - alpha) * _ema_state[5]
+
+    sample = list(_ema_state)
     sensor_buffer.append(sample)
     chart_buffer.append(sample)
 

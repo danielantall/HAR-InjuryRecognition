@@ -20,9 +20,9 @@ DATA_DIR = Path(__file__).parent / "data"
 MODEL_DIR = Path(__file__).parent / "model"
 
 SIGNAL_FILES = [
-    "total_acc_x_{}.txt",
-    "total_acc_y_{}.txt",
-    "total_acc_z_{}.txt",
+    "body_acc_x_{}.txt",
+    "body_acc_y_{}.txt",
+    "body_acc_z_{}.txt",
     "body_gyro_x_{}.txt",
     "body_gyro_y_{}.txt",
     "body_gyro_z_{}.txt",
@@ -67,7 +67,7 @@ def load_labels(split: str) -> np.ndarray:
 
 def extract_class0(X: np.ndarray, y: np.ndarray) -> np.ndarray:
     """Keep only WALKING_DOWNSTAIRS windows → Class 0 (optimal form)."""
-    mask = y == WALKING_DOWNSTAIRS_LABEL
+    mask = np.isin(y, [1, 2, 3])  # 1: WALKING, 2: WALKING_UPSTAIRS, 3: WALKING_DOWNSTAIRS
     return X[mask]
 
 
@@ -85,19 +85,19 @@ def synthesize_fatigue(X_clean: np.ndarray, rng: np.random.Generator) -> np.ndar
     n_samples, n_steps, n_channels = X_fatigued.shape
 
     # --- Inject instability: Gaussian noise on ALL channels ---
-    noise = rng.normal(loc=0.0, scale=0.05, size=X_fatigued.shape)
+    noise = rng.normal(loc=0.0, scale=0.1, size=X_fatigued.shape)
     X_fatigued += noise
 
     # --- Simulate impact spikes: amplify peaks in acc channels (0,1,2) ---
     for i in range(n_samples):
-        for ch in range(3):  # total_acc_x, y, z only
+        for ch in range(3):  # body_acc_x, y, z only
             signal = X_fatigued[i, :, ch]
             # Find the top 10% peak indices
             threshold = np.percentile(np.abs(signal), 90)
             peak_mask = np.abs(signal) >= threshold
-            # Multiply peaks by a random factor in [1.5, 3.0]
+            # Multiply peaks by a random factor in [2.0, 4.0]
             n_peaks = np.sum(peak_mask)
-            factors = rng.uniform(1.5, 3.0, size=n_peaks)
+            factors = rng.uniform(2.0, 4.0, size=n_peaks)
             signal[peak_mask] *= factors
             X_fatigued[i, :, ch] = signal
 
@@ -112,26 +112,29 @@ def build_model():
     """
     1D-CNN architecture:
       Conv1D(64) → MaxPool → Conv1D(128) → MaxPool
-      → Flatten → Dense(64, dropout=0.5) → Sigmoid
+      → Flatten → Dense(64, dropout=0.6) → Sigmoid
     """
     import tensorflow as tf
     from tensorflow import keras
     from tensorflow.keras import layers
+    from tensorflow.keras.regularizers import l2
 
     model = keras.Sequential([
         # Block 1: micro-patterns (sharp spikes, tremors)
         layers.Conv1D(64, kernel_size=5, activation="relu",
+                      kernel_regularizer=l2(0.001),
                       input_shape=(TIMESTEPS, N_FEATURES)),
         layers.MaxPooling1D(pool_size=2),
 
         # Block 2: macro-patterns (stride rhythm, impact sequences)
-        layers.Conv1D(128, kernel_size=5, activation="relu"),
+        layers.Conv1D(128, kernel_size=5, activation="relu",
+                      kernel_regularizer=l2(0.001)),
         layers.MaxPooling1D(pool_size=2),
 
         # Classification head
         layers.Flatten(),
-        layers.Dense(64, activation="relu"),
-        layers.Dropout(0.5),
+        layers.Dense(64, activation="relu", kernel_regularizer=l2(0.001)),
+        layers.Dropout(0.6),
         layers.Dense(1, activation="sigmoid"),
     ])
 
