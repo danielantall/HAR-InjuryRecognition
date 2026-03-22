@@ -1,1 +1,5 @@
 d.sh
+.venv311
+.venv
+__pycache__/
+.cursor/

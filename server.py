@@ -21,8 +21,14 @@ from flask_cors import CORS
 # ─────────────────────────────────────────────
 
 BUFFER_SIZE = 128
-PREDICTION_THRESHOLD = 0.6
-MODEL_PATH = Path(__file__).parent / "model" / "fatigue_model.keras"
+PREDICTION_THRESHOLD = 0.5  # Lower per-window confidence is acceptable due to rolling aggregate vote
+VOTE_WINDOW = 10            # Look at the last ~10 inferenced windows 
+VOTE_THRESH = 7             # Require 7 out of 10 to vote 'Fatigued' before triggering alarm
+MODEL_PATH = Path(__file__).parent / "model" / "fatigue_model_observed.keras"
+
+# Organic Data Normalisation States exactly synchronized with observed dataset
+TRAIN_MEAN = np.array([-0.01538, -0.02538, 0.000049, 0.010705, -0.000063, 0.006921])
+TRAIN_STD = np.array([1.377923, 2.687030, 1.489132, 0.292874, 0.727760, 0.313942]) + 1e-8
 
 # ─────────────────────────────────────────────
 # APP SETUP
@@ -56,6 +62,9 @@ sensor_buffer = deque(maxlen=BUFFER_SIZE)
 CHART_BUFFER_SIZE = 200
 chart_buffer = deque(maxlen=CHART_BUFFER_SIZE)
 orient_buffer = deque(maxlen=CHART_BUFFER_SIZE)  # [pitch, roll, yaw]
+
+# Prediction Vote Buffer to suppress transient false positives
+recent_predictions = deque(maxlen=VOTE_WINDOW)
 
 # Model loaded at startup
 model = None
@@ -95,7 +104,7 @@ def run_inference():
     if model is None or len(sensor_buffer) < BUFFER_SIZE:
         return
 
-    # Shape: (1, 128, 6)
+    # Shape: (128, 6)
     window_data = np.array(list(sensor_buffer))
     
     # Calculate standard deviation of body acceleration (first 3 columns)
@@ -106,10 +115,18 @@ def run_inference():
     if mean_std < STATIONARY_THRESHOLD:
         prob = 0.0
         label = "Optimal"
+        recent_predictions.clear()  # Clear votes if the user stops moving
     else:
-        window = window_data.reshape(1, BUFFER_SIZE, 6)
-        prob = float(model.predict(window, verbose=0)[0][0])
-        label = "Fatigued" if prob > PREDICTION_THRESHOLD else "Optimal"
+        # Z-Score Normalization using the precise mean/std from your observed training data
+        window_norm = (window_data - TRAIN_MEAN) / TRAIN_STD
+        window_norm = window_norm.reshape(1, BUFFER_SIZE, 6)
+        
+        prob = float(model.predict(window_norm, verbose=0)[0][0])
+        
+        # Sliding Window Vote (kills transient real-world spikes)
+        recent_predictions.append(1 if prob > PREDICTION_THRESHOLD else 0)
+        is_fatigued = sum(recent_predictions) >= VOTE_THRESH
+        label = "Fatigued" if is_fatigued else "Optimal"
 
     with state_lock:
         global_state["prediction"] = label
@@ -274,8 +291,8 @@ def _process_orientation(values_obj):
             global_state["pitch"] = round(pitch, 2)
             global_state["roll"] = round(roll, 2)
             global_state["yaw"] = round(yaw, 2)
-        orient_buffer.append([round(pitch, 2), round(roll, 2), round(yaw, 2)])
-        return
+            orient_buffer.append([round(pitch, 2), round(roll, 2), round(yaw, 2)])
+            return
 
         # Try euler angles (pitch, roll, yaw)
         for k, orig in keys.items():
@@ -363,19 +380,14 @@ def _process_sample(acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z):
     with state_lock:
         grav = global_state.get("latest_gravity", (0.0, 0.0, 9.81))
 
-    # Subtract gravity and convert to g
-    body_acc_x = (acc_x - grav[0]) / 9.81
-    body_acc_y = (acc_y - grav[1]) / 9.81
-    body_acc_z = (acc_z - grav[2]) / 9.81
-
-    # Apply EMA Smoothing
+    # Apply EMA Smoothing directly to organic inputs (model trained on raw values natively)
     alpha = 0.3
     if _ema_state is None:
-        _ema_state = [body_acc_x, body_acc_y, body_acc_z, gyro_x, gyro_y, gyro_z]
+        _ema_state = [acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z]
     else:
-        _ema_state[0] = alpha * body_acc_x + (1 - alpha) * _ema_state[0]
-        _ema_state[1] = alpha * body_acc_y + (1 - alpha) * _ema_state[1]
-        _ema_state[2] = alpha * body_acc_z + (1 - alpha) * _ema_state[2]
+        _ema_state[0] = alpha * acc_x + (1 - alpha) * _ema_state[0]
+        _ema_state[1] = alpha * acc_y + (1 - alpha) * _ema_state[1]
+        _ema_state[2] = alpha * acc_z + (1 - alpha) * _ema_state[2]
         _ema_state[3] = alpha * gyro_x + (1 - alpha) * _ema_state[3]
         _ema_state[4] = alpha * gyro_y + (1 - alpha) * _ema_state[4]
         _ema_state[5] = alpha * gyro_z + (1 - alpha) * _ema_state[5]

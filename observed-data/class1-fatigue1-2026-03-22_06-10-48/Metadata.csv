@@ -1,0 +1,2 @@
+version,device name,recording epoch time,recording time,recording timezone,platform,appVersion,device id,sensors,sampleRateMs,standardisation,platform version
+3,iPhone 16,1774159848497,2026-03-22_06-10-48,America/Toronto,ios,1.54.3,fbc33243-27e7-4c4f-bf92-65317e17bb7c,Accelerometer|Gravity|Gyroscope|Orientation|Annotation|GyroscopeUncalibrated|AccelerometerUncalibrated,20|20|20|20||20|20,false,26.3.1

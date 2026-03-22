@@ -163,35 +163,45 @@ def main():
     X_test_raw = load_inertial_signals("test")
     y_test_raw = load_labels("test")
 
-    # --- Merge train+test, then filter WALKING_DOWNSTAIRS ---
-    X_all = np.concatenate([X_train_raw, X_test_raw], axis=0)
-    y_all = np.concatenate([y_train_raw, y_test_raw], axis=0)
-    print(f"\n📊 Total windows loaded: {X_all.shape[0]}")
+    # --- Build TRAIN set from UCI HAR train split only (no leakage) ---
+    print(f"\n📊 Train split windows: {X_train_raw.shape[0]}")
+    rng_train = np.random.default_rng(seed=42)
 
-    X_class0 = extract_class0(X_all, y_all)
-    print(f"🚶 WALKING_DOWNSTAIRS windows (Class 0): {X_class0.shape[0]}")
+    X_class0_train = extract_class0(X_train_raw, y_train_raw)
+    print(f"🚶 Dynamic-activity windows — Train (Class 0): {X_class0_train.shape[0]}")
 
-    # --- Synthesize fatigued data ---
-    print("⚡ Synthesizing fatigue corruption (Class 1)...")
-    X_class1 = synthesize_fatigue(X_class0, rng)
+    print("⚡ Synthesizing fatigue corruption for training set (Class 1)...")
+    X_class1_train = synthesize_fatigue(X_class0_train, rng_train)
 
-    # --- Combine & shuffle ---
-    X = np.concatenate([X_class0, X_class1], axis=0)
-    y = np.concatenate([
-        np.zeros(len(X_class0)),   # Class 0: optimal
-        np.ones(len(X_class1)),    # Class 1: fatigued
+    X_train_all = np.concatenate([X_class0_train, X_class1_train], axis=0)
+    y_train_all = np.concatenate([
+        np.zeros(len(X_class0_train)),
+        np.ones(len(X_class1_train)),
     ])
+    shuffle_train = rng_train.permutation(len(X_train_all))
+    X_train, y_train = X_train_all[shuffle_train], y_train_all[shuffle_train]
+    print(f"🔀 Train set: {X_train.shape[0]} windows  "
+          f"(Class 0: {int(np.sum(y_train == 0))}, Class 1: {int(np.sum(y_train == 1))})")
 
-    shuffle_idx = rng.permutation(len(X))
-    X, y = X[shuffle_idx], y[shuffle_idx]
-    print(f"🔀 Combined dataset: {X.shape[0]} windows  "
-          f"(Class 0: {int(np.sum(y == 0))}, Class 1: {int(np.sum(y == 1))})")
+    # --- Build VAL/TEST set from UCI HAR test split only (no leakage) ---
+    print(f"\n📊 Test split windows: {X_test_raw.shape[0]}")
+    rng_test = np.random.default_rng(seed=99)
 
-    # --- 80/20 split ---
-    split = int(0.8 * len(X))
-    X_train, X_val = X[:split], X[split:]
-    y_train, y_val = y[:split], y[split:]
-    print(f"✂️  Train: {len(X_train)}  |  Val: {len(X_val)}")
+    X_class0_test = extract_class0(X_test_raw, y_test_raw)
+    print(f"🚶 Dynamic-activity windows — Test (Class 0): {X_class0_test.shape[0]}")
+
+    print("⚡ Synthesizing fatigue corruption for test set (Class 1)...")
+    X_class1_test = synthesize_fatigue(X_class0_test, rng_test)
+
+    X_test_all = np.concatenate([X_class0_test, X_class1_test], axis=0)
+    y_test_all = np.concatenate([
+        np.zeros(len(X_class0_test)),
+        np.ones(len(X_class1_test)),
+    ])
+    shuffle_test = rng_test.permutation(len(X_test_all))
+    X_val, y_val = X_test_all[shuffle_test], y_test_all[shuffle_test]
+    print(f"🔀 Val/Test set: {X_val.shape[0]} windows  "
+          f"(Class 0: {int(np.sum(y_val == 0))}, Class 1: {int(np.sum(y_val == 1))})")
 
     # --- Build & train ---
     print("\n🧠 Building 1D-CNN...")
