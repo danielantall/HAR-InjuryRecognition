@@ -1,0 +1,194 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    transition: background-color 0.8s ease;
+}
+
+body.optimal {
+    background: #e5e5e5;
+}
+
+body.fatigued {
+    background: #c0392b;
+}
+
+/* ── Canvas (left half) ── */
+#scene-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 55%;
+    height: 100%;
+    z-index: 0;
+}
+
+/* ── Status label ── */
+.status-bar {
+    position: fixed;
+    top: 24px;
+    left: 24px;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #999;
+    transition: background 0.4s ease, box-shadow 0.4s ease;
+}
+
+.status-dot.connected {
+    background: #27ae60;
+    box-shadow: 0 0 8px rgba(39, 174, 96, 0.6);
+}
+
+.status-text {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #555;
+    transition: color 0.8s ease;
+}
+
+body.fatigued .status-text {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.prediction-label {
+    position: fixed;
+    bottom: 36px;
+    left: 24px;
+    z-index: 20;
+    font-size: 48px;
+    font-weight: 900;
+    letter-spacing: -1px;
+    color: #333;
+    transition: color 0.8s ease;
+}
+
+body.fatigued .prediction-label {
+    color: #fff;
+}
+
+/* ── Debug panel (right half) ── */
+.debug-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 45%;
+    height: 100%;
+    z-index: 10;
+    padding: 20px 24px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.debug-panel h2 {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 2px;
+    transition: color 0.8s ease;
+}
+
+body.fatigued .debug-panel h2 {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.chart-box {
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 12px;
+    padding: 14px 16px 10px;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    transition: background 0.8s ease, border-color 0.8s ease;
+}
+
+body.fatigued .chart-box {
+    background: rgba(0, 0, 0, 0.2);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.chart-box .chart-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #666;
+    margin-bottom: 8px;
+    transition: color 0.8s ease;
+}
+
+body.fatigued .chart-box .chart-title {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.chart-box canvas {
+    flex: 1;
+    min-height: 0;
+}
+
+/* ── Stats row ── */
+.stats-row {
+    display: flex;
+    gap: 10px;
+}
+
+.stat-pill {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 10px;
+    padding: 10px 14px;
+    transition: background 0.8s ease, border-color 0.8s ease;
+}
+
+body.fatigued .stat-pill {
+    background: rgba(0, 0, 0, 0.2);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.stat-pill .label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #999;
+    transition: color 0.8s ease;
+}
+
+body.fatigued .stat-pill .label {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.stat-pill .val {
+    font-size: 18px;
+    font-weight: 700;
+    color: #333;
+    font-variant-numeric: tabular-nums;
+    margin-top: 2px;
+    transition: color 0.8s ease;
+}
+
+body.fatigued .stat-pill .val {
+    color: #fff;
+}

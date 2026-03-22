@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HAR Fatigue Detection</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/dashboard.css">
+
+</head>
+
+<body class="optimal">
+
+    <div id="scene-container"></div>
+
+    <div class="status-bar">
+        <div class="status-dot" id="conn-dot"></div>
+        <span class="status-text" id="conn-label">Waiting for sensor</span>
+    </div>
+
+    <div class="prediction-label" id="prediction-label">OPTIMAL</div>
+
+    <div class="debug-panel">
+        <h2>Live Sensor Debug</h2>
+
+        <div class="stats-row">
+            <div class="stat-pill">
+                <div class="label">Pitch</div>
+                <div class="val" id="val-pitch">0.0°</div>
+            </div>
+            <div class="stat-pill">
+                <div class="label">Roll</div>
+                <div class="val" id="val-roll">0.0°</div>
+            </div>
+            <div class="stat-pill">
+                <div class="label">Yaw</div>
+                <div class="val" id="val-yaw">0.0°</div>
+            </div>
+            <div class="stat-pill">
+                <div class="label">Confidence</div>
+                <div class="val" id="val-conf">0%</div>
+            </div>
+            <div class="stat-pill">
+                <div class="label">Buffer</div>
+                <div class="val" id="val-buf">0/128</div>
+            </div>
+        </div>
+
+        <div class="chart-box">
+            <div class="chart-title">Orientation (Pitch, Roll, Yaw)</div>
+            <canvas id="chart-orient"></canvas>
+        </div>
+
+        <div class="chart-box">
+            <div class="chart-title">Accelerometer (X, Y, Z)</div>
+            <canvas id="chart-acc"></canvas>
+        </div>
+
+        <div class="chart-box">
+            <div class="chart-title">Gyroscope (X, Y, Z)</div>
+            <canvas id="chart-gyro"></canvas>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script type="module" src="/static/dashboard.js"></script>
+</body>
+
+</html>
