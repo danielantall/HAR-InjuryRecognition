@@ -21,7 +21,7 @@ from flask_cors import CORS
 # ─────────────────────────────────────────────
 
 BUFFER_SIZE = 128
-PREDICTION_THRESHOLD = 0.5  # Lower per-window confidence is acceptable due to rolling aggregate vote
+PREDICTION_THRESHOLD = 0.8  # Lower per-window confidence is acceptable due to rolling aggregate vote
 VOTE_WINDOW = 10            # Look at the last ~10 inferenced windows 
 VOTE_THRESH = 7             # Require 7 out of 10 to vote 'Fatigued' before triggering alarm
 MODEL_PATH = Path(__file__).parent / "model" / "fatigue_model_observed.keras"
