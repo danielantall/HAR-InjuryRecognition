@@ -1,4 +1,4 @@
-# HARper
+# HARper - 🏆 2nd Place Overall @ DataQuest '26
 
 > **Core question**: Can we detect biomechanical fatigue *before* it leads to injury, using only the accelerometer and gyroscope already inside your phone?
 
